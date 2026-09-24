@@ -4,47 +4,81 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Hand Sign Recognition</title>
+<link rel="icon" type="image/png" href="images/sticker/default.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; }
-  body { font-family: sans-serif; background: #111; color: #eee; text-align: center; margin: 0; padding: 20px; }
-  h1 { font-size: 1.3rem; }
-  #container { position: relative; width: 100%; max-width: 640px; aspect-ratio: 4 / 3; margin: 0 auto; }
-  video, canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 8px; transform: scaleX(-1); }
-  #status { margin-top: 12px; font-size: 1rem; min-height: 1.5em; color: #9f9; }
-  #result { min-height: 130px; display: flex; align-items: center; justify-content: center; }
-  #result img { max-height: 120px; max-width: 100%; border-radius: 8px; background: #222; }
-  #score { font-size: 1rem; color: #9f9; }
-  button { margin-top: 10px; padding: 10px 20px; font-size: 1rem; cursor: pointer; }
-  #signList { margin-top: 24px; }
-  #signList h2 { font-size: 1rem; color: #aaa; font-weight: normal; }
-  #signGrid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-  .sign-tag { padding: 4px 10px; font-size: 0.85rem; color: #ccc; background: #222; border: 1px solid #333; border-radius: 14px; text-transform: capitalize; }
+  html, body { height: 100%; overflow: hidden; }
+  body { font-family: "Pixelify Sans", sans-serif; background: #111; color: #eee; text-align: center; margin: 0; padding: 10px; height: 100vh; transition: background 0.5s ease; display: flex; flex-direction: column; }
+  #resultCard { margin-top: auto; margin-bottom: 50px}
+  h1 { font-size: 1.4rem; letter-spacing: 1px; margin: 0; }
+  #container { position: relative; width: 100%; max-width: 640px; aspect-ratio: 4 / 3; margin: 0 auto; border: 4px solid #fff; outline: 4px solid #000; box-shadow: 0 0 0 4px #fff, 0 0 0 8px #000; image-rendering: pixelated; }
+  video, canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 0; transform: scaleX(-1); }
+  #status { margin-top: 6px; font-size: 1rem; min-height: 1.3em; color: #9f9; }
+  #result { min-height: 90px; display: flex; align-items: center; justify-content: center; }
+  #result img { max-height: 80px; max-width: 100%; border-radius: 0; background: #222; border: 3px solid #fff; outline: 2px solid #000; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #000; padding: 4px; }
+  #score { font-size: 1rem; color: #000; }
+  button { margin-top: 8px; padding: 8px 16px; font-size: 1rem; font-family: inherit; cursor: pointer; background: #eee; color: #111; border: 3px solid #000; box-shadow: 4px 4px 0 #000; border-radius: 0; }
+  button:active { box-shadow: 2px 2px 0 #000; transform: translate(2px, 2px); }
+  #signList { margin-top: 10px; }
+  #signList h2 { font-size: 1rem; color: #333; font-weight: normal; margin: 0 0 6px; }
+  #signGrid { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .sign-tag { padding: 3px 8px; font-size: 0.85rem; color: #eee; background: #222; border: 2px solid #555; border-radius: 0; text-transform: capitalize; }
+
+  .pixel-card { background: #fff; color: #000; border: 2px solid #fff; outline: 2px solid #000; box-shadow: 0 0 0 4px #fff, 0 0 0 8px #000; border-radius: 0; padding: 8px; max-width: 640px; margin: 0 auto 10px; }
 
   @media (max-width: 480px) {
-    body { padding: 12px; }
-    h1 { font-size: 1.1rem; }
-    button { width: 100%; padding: 12px; font-size: 1.05rem; }
-    #result img { max-height: 90px; }
+    body { padding: 24px; }
+    h1 { font-size: 1.15rem; }
+    button { width: 100%; padding: 10px; font-size: 1rem; }
+    #result img { max-height: 64px; }
   }
+
+  #bgRipple {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(circle at var(--rx, 50%) var(--ry, 50%), #fff 0%, var(--rlight, #fff) 12%, var(--rdark, #000) var(--rsize, 0%), transparent var(--rsize, 0%));
+  }
+
+  #confettiLayer { position: fixed; inset: 0; pointer-events: none; z-index: 10; overflow: hidden; }
+  .confetti-piece { position: absolute; will-change: transform, opacity; line-height: 1; }
+
+  #emojiFloatLayer { position: fixed; inset: 0; pointer-events: none; z-index: -1; overflow: hidden; }
+  .emoji-float { position: absolute; will-change: transform; width: auto; height: auto; }
 </style>
 </head>
 <body>
 
-<h1>Hand Sign Sticker</h1>
+<div id="bgRipple"></div>
+<div id="emojiFloatLayer"></div>
+<div id="confettiLayer"></div>
+<div class="pixel-card">
+  <h1>Hand Sign Sticker</h1>
+</div>
+
 <div id="container">
   <video id="webcam" autoplay playsinline></video>
   <canvas id="overlay"></canvas>
 </div>
 <div id="status">Loading model...</div>
-<div id="result"><img id="resultImg" src="images/default.png" alt="sign"></div>
-<div id="score"></div>
-<button id="startBtn">Start Camera</button>
 
-<div id="signList">
-  <h2>Available Signs</h2>
-  <div id="signGrid"></div>
+<div class="pixel-card" id="resultCard">
+  <div id="result"><img id="resultImg" src="images/sticker/default.png" alt="sign"></div>
+  <div id="score"></div>
+  <button id="startBtn">Start Camera</button>
+
+  <div id="signList">
+    <h2>Available Signs</h2>
+    <div id="signGrid"></div>
+  </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/animejs@3.2.2/lib/anime.min.js"></script>
 <script type="module">
 import {
   GestureRecognizer,
@@ -62,17 +96,234 @@ const resultImg = document.getElementById("resultImg");
 const scoreEl = document.getElementById("score");
 const startBtn = document.getElementById("startBtn");
 
-const DEFAULT_IMAGE = "images/default.png";
+const DEFAULT_IMAGE = "images/sticker/default.png";
 const CUSTOM_CONFIDENCE_THRESHOLD = 0.7;
 const GESTURE_IMAGES = {
-  "Closed_Fist": "images/close-fist.png",
-  "Pointing_Up": "images/pointing-up.png"
+  "Closed_Fist": "images/sticker/close-fist.png",
+  "Pointing_Up": "images/sticker/pointing-up.png"
 };
 const SIGN_IMAGES = {
-  "give": "images/give.png",
-  "izien": "images/izien.png",
-  "mikier": "images/mikier.png"
+  "give": "images/sticker/give.png",
+  "izien": "images/sticker/izien.png",
+  "mikier": "images/sticker/mikier.png"
 };
+
+const EMOJI_IMAGES = {
+  "give": "images/emoji/give.png",
+  "izien": "images/emoji/izien.png",
+  "mikier": "images/emoji/mikier.png",
+  "Closed_Fist": "images/emoji/close fist.png",
+  "Pointing_Up": "images/emoji/pointing up.png"
+};
+
+const EMOJI_SIZE = 100;
+const EMOJI_SPEED = 50;
+const EMOJI_START_DELAY_MS = 2000;
+const EMOJI_DIRECTIONS = 8;
+const emojiFloatLayer = document.getElementById("emojiFloatLayer");
+
+// 8 directions = 360deg / 8 = 45deg apart
+const EMOJI_DIRECTION_VECTORS = Array.from({ length: EMOJI_DIRECTIONS }, (_, i) => {
+  const angle = (i * (360 / EMOJI_DIRECTIONS)) * (Math.PI / 180);
+  return { dx: Math.cos(angle), dy: Math.sin(angle) };
+});
+
+let emojiTiles = [];
+let emojiPatternLabel = null;
+let emojiRafId = null;
+let emojiLastTick = null;
+
+function clearEmojiGrid() {
+  for (const t of emojiTiles) t.el.remove();
+  emojiTiles = [];
+  emojiPatternLabel = null;
+  if (emojiRafId) {
+    cancelAnimationFrame(emojiRafId);
+    emojiRafId = null;
+  }
+  emojiLastTick = null;
+}
+
+function buildEmojiGrid(label) {
+  clearEmojiGrid();
+  const src = encodeURI(EMOJI_IMAGES[label]);
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const cols = Math.ceil(vw / EMOJI_SIZE) + 1;
+  const rows = Math.ceil(vh / EMOJI_SIZE) + 1;
+
+  // one shared direction per grid, re-picked each time the sign changes
+  const dir = EMOJI_DIRECTION_VECTORS[Math.floor(Math.random() * EMOJI_DIRECTIONS)];
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const el = document.createElement("img");
+      el.src = src;
+      el.className = "emoji-float";
+      el.style.maxWidth = EMOJI_SIZE + "px";
+      el.style.maxHeight = EMOJI_SIZE + "px";
+      const x = c * EMOJI_SIZE;
+      const y = r * EMOJI_SIZE;
+      el.style.left = x + "px";
+      el.style.top = y + "px";
+      emojiFloatLayer.appendChild(el);
+      emojiTiles.push({ el, x, y, dx: dir.dx, dy: dir.dy });
+    }
+  }
+  emojiPatternLabel = label;
+  emojiRafId = requestAnimationFrame(tickEmojiGrid);
+}
+
+function tickEmojiGrid(now) {
+  if (emojiLastTick === null) emojiLastTick = now;
+  const dt = (now - emojiLastTick) / 1000;
+  emojiLastTick = now;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  for (const t of emojiTiles) {
+    t.x += t.dx * EMOJI_SPEED * dt;
+    t.y += t.dy * EMOJI_SPEED * dt;
+    // wrap around: exit one edge, re-enter from the opposite edge
+    if (t.x < -EMOJI_SIZE) t.x = vw;
+    else if (t.x > vw) t.x = -EMOJI_SIZE;
+    if (t.y < -EMOJI_SIZE) t.y = vh;
+    else if (t.y > vh) t.y = -EMOJI_SIZE;
+    t.el.style.left = t.x + "px";
+    t.el.style.top = t.y + "px";
+  }
+  emojiRafId = requestAnimationFrame(tickEmojiGrid);
+}
+
+const DEFAULT_BG = "#111";
+const BG_COLORS = {
+  "give": { dark: "#6b0f3e", light: "#ff9fd6" },
+  "izien": { dark: "#0a1f4a", light: "#7ec8ff" },
+  "mikier": { dark: "#6b3400", light: "#ffb35c" },
+  "Closed_Fist": { dark: "#4a0808", light: "#ff6b6b" },
+  "Pointing_Up": { dark: "#5c4b00", light: "#fff176" }
+};
+
+function setBackground(label) {
+  const c = BG_COLORS[label];
+  document.body.style.background = c ? `linear-gradient(to top, ${c.dark}, ${c.light})` : DEFAULT_BG;
+}
+
+const bgRipple = document.getElementById("bgRipple");
+let rippleAnim = null;
+
+function triggerRipple(label) {
+  const c = BG_COLORS[label];
+  if (!c) return;
+  const rect = document.getElementById("container").getBoundingClientRect();
+  const cx = ((rect.left + rect.width / 2) / window.innerWidth) * 100;
+  const cy = ((rect.top + rect.height / 2) / window.innerHeight) * 100;
+  bgRipple.style.setProperty("--rx", cx + "%");
+  bgRipple.style.setProperty("--ry", cy + "%");
+  bgRipple.style.setProperty("--rlight", c.light);
+  bgRipple.style.setProperty("--rdark", c.dark);
+  bgRipple.style.setProperty("--rsize", "0%");
+  bgRipple.style.opacity = 0;
+
+  if (rippleAnim) rippleAnim.pause();
+  const state = { size: 0, opacity: 0 };
+  rippleAnim = anime({
+    targets: state,
+    size: [
+      { value: 150, duration: 1200, easing: "easeOutExpo" }
+    ],
+    opacity: [
+      { value: 1, duration: 180, easing: "easeOutQuad" },
+      { value: 0, duration: 1000, delay: 100, easing: "easeInQuad" }
+    ],
+    update: () => {
+      bgRipple.style.setProperty("--rsize", state.size + "%");
+      bgRipple.style.opacity = state.opacity;
+    }
+  });
+}
+
+const CONFETTI_EMOJI = {
+  "give": "🤌🏼",
+  "izien": "🙏🏼",
+  "mikier": "👉🏼",
+  "Closed_Fist": "✊🏼",
+  "Pointing_Up": "☝🏼"
+};
+const CONFETTI_INTERVAL_MS = 3000;
+const CONFETTI_COUNT = 50;
+const confettiLayer = document.getElementById("confettiLayer");
+
+function spawnConfettiTop(emoji, rect, count) {
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement("span");
+    el.className = "confetti-piece";
+    el.textContent = emoji;
+    const size = 16 + Math.random() * 30;
+    el.style.fontSize = size + "px";
+    const startX = rect.left + Math.random() * rect.width;
+    const startY = rect.top;
+    el.style.left = startX + "px";
+    el.style.top = startY + "px";
+    confettiLayer.appendChild(el);
+
+    const dx = (Math.random() - 0.5) * 320;
+    const riseHeight = 80 + Math.random() * 180;
+    const fallHeight = 220 + Math.random() * 220;
+    const rotate = (Math.random() - 0.5) * 720;
+    const duration = 1300 + Math.random() * 900;
+
+    anime({
+      targets: el,
+      translateX: dx,
+      translateY: [
+        { value: -riseHeight, duration: duration * 0.35, easing: "easeOutQuad" },
+        { value: -riseHeight + fallHeight, duration: duration * 0.65, easing: "easeInQuad" }
+      ],
+      rotate: rotate,
+      opacity: [
+        { value: 1, duration: 150, easing: "easeOutQuad" },
+        { value: 0, duration: duration * 0.3, delay: duration * 0.55, easing: "easeInQuad" }
+      ],
+      easing: "easeOutQuad",
+      complete: () => el.remove()
+    });
+  }
+}
+
+function burstConfetti(label) {
+  const emoji = CONFETTI_EMOJI[label];
+  if (!emoji) return;
+  const rect = document.getElementById("container").getBoundingClientRect();
+  spawnConfettiTop(emoji, rect, CONFETTI_COUNT);
+}
+
+const CONFETTI_FIRST_DELAY_MS = 2000;
+let stableLabel = null;
+let labelStableSince = 0;
+let lastConfettiAt = 0;
+let nextConfettiDelay = CONFETTI_FIRST_DELAY_MS;
+
+function updateBackgroundState(matchedLabel, now) {
+  if (matchedLabel !== stableLabel) {
+    stableLabel = matchedLabel;
+    labelStableSince = now;
+    lastConfettiAt = now;
+    nextConfettiDelay = CONFETTI_FIRST_DELAY_MS;
+    if (matchedLabel) triggerRipple(matchedLabel);
+    setBackground(matchedLabel);
+    clearEmojiGrid();
+    return;
+  }
+  if (matchedLabel && now - lastConfettiAt >= nextConfettiDelay) {
+    burstConfetti(matchedLabel);
+    lastConfettiAt = now;
+    nextConfettiDelay = CONFETTI_INTERVAL_MS;
+  }
+  if (matchedLabel && emojiPatternLabel !== matchedLabel && now - labelStableSince >= EMOJI_START_DELAY_MS) {
+    buildEmojiGrid(matchedLabel);
+  }
+}
 
 function setImage(imgEl, src) {
   if (imgEl.getAttribute("src") !== src) imgEl.src = src;
@@ -137,6 +388,7 @@ async function startCamera() {
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   running = true;
+  statusEl.textContent = "";
   predictLoop();
 }
 
@@ -160,17 +412,21 @@ function predictLoop() {
       const custom = classifyCustomSign(results.landmarks[0]);
       if (custom.score >= CUSTOM_CONFIDENCE_THRESHOLD) {
         setImage(resultImg, SIGN_IMAGES[custom.label] || DEFAULT_IMAGE);
+        updateBackgroundState(custom.label, nowMs);
         scoreEl.textContent = `${custom.label} — ${(custom.score * 100).toFixed(1)}%`;
       } else if (results.gestures && results.gestures.length > 0 && results.gestures[0][0].categoryName !== "None") {
         const top = results.gestures[0][0];
         setImage(resultImg, GESTURE_IMAGES[top.categoryName] || DEFAULT_IMAGE);
+        updateBackgroundState(top.categoryName, nowMs);
         scoreEl.textContent = `${top.categoryName} — ${(top.score * 100).toFixed(1)}%`;
       } else {
         setImage(resultImg, DEFAULT_IMAGE);
+        updateBackgroundState(null, nowMs);
         scoreEl.textContent = "No sign match";
       }
     } else {
       setImage(resultImg, DEFAULT_IMAGE);
+      updateBackgroundState(null, nowMs);
       scoreEl.textContent = "No hand detected";
     }
   } catch (err) {
