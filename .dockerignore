@@ -1,0 +1,17 @@
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.wrangler
+.vscode
+.kilo
+docker
+deploy
+apps/api/uploads
+apps/api/src/generated
+apps/api/test
+apps/web/*
+!apps/web/package.json

@@ -1,0 +1,56 @@
+# Production stack for the VPS: Caddy (HTTPS) in front of the API.
+# Database is Supabase, uploads go to R2 — nothing stateful runs here except Caddy's certs.
+#
+#   cd deploy
+#   docker compose run --rm migrate      # apply Prisma migrations
+#   docker compose up -d --build         # build + start
+name: hand-sign
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    image: hand-sign-api
+    restart: unless-stopped
+    env_file: api.env
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      # Caddy is one proxy hop in front
+      TRUST_PROXY: '1'
+      NODE_OPTIONS: --max-old-space-size=320
+    mem_limit: 448m
+    # no `ports:` — only reachable by Caddy on the internal network
+
+  # One-off: docker compose run --rm migrate
+  migrate:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+      target: build
+    image: hand-sign-api-migrate
+    profiles: [migrate]
+    env_file: api.env
+    working_dir: /app/apps/api
+    command: npx prisma migrate deploy
+
+volumes:
+  caddy-data:
+  caddy-config:
