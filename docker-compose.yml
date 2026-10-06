@@ -1,0 +1,22 @@
+# Local Postgres for development. Production uses a hosted DB via DATABASE_URL.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: hand_sign
+      POSTGRES_PASSWORD: hand_sign
+      POSTGRES_DB: hand_sign
+    ports:
+      - '5432:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # creates hand_sign_test for e2e tests (runs only on a fresh volume)
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U hand_sign']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  db-data:

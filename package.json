@@ -1,0 +1,22 @@
+{
+  "name": "hand-sign",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build:shared": "npm run build -w @hand-sign/shared",
+    "dev": "npm run build:shared && concurrently -k -n shared,api,web -c gray,red,cyan \"npm run dev -w @hand-sign/shared\" \"npm run start:dev -w @hand-sign/api\" \"npm run dev -w @hand-sign/web\"",
+    "dev:web": "npm run build:shared && npm run dev -w @hand-sign/web",
+    "dev:api": "npm run build:shared && npm run start:dev -w @hand-sign/api",
+    "build": "npm run build:shared && npm run build -w @hand-sign/web -w @hand-sign/api",
+    "check": "npm run build:shared && npm run check -w @hand-sign/web && npm run build -w @hand-sign/api",
+    "test": "npm run build:shared && npm test -w @hand-sign/api",
+    "deploy:web": "npm run build:shared && npm run deploy -w @hand-sign/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

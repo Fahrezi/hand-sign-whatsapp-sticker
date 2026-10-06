@@ -1,0 +1,33 @@
+* { box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: "Micro 5", sans-serif;
+  background: #111;
+  color: #eee;
+  text-align: center;
+  margin: 0;
+  padding: 10px;
+  height: 100vh;
+  transition: background 0.5s ease;
+}
+#app { height: 100%; display: flex; flex-direction: column; }
+
+@media (max-width: 480px) {
+  body { padding: 24px; }
+}
+
+.pixel-card {
+  background: #fff; color: #000; border: 2px solid #fff; outline: 2px solid #000;
+  box-shadow: 0 0 0 4px #fff, 0 0 0 8px #000; border-radius: 0; padding: 8px;
+  max-width: 640px; width: 100%; margin: 0 auto 10px;
+}
+
+button {
+  margin-top: 8px; padding: 8px 16px; font-size: 1rem; font-family: inherit; cursor: pointer;
+  background: #eee; color: #111; border: 3px solid #000; box-shadow: 4px 4px 0 #000; border-radius: 0;
+}
+button:active { box-shadow: 2px 2px 0 #000; transform: translate(2px, 2px); }
+
+@media (max-width: 480px) {
+  button { width: 100%; padding: 10px; font-size: 1rem; }
+}

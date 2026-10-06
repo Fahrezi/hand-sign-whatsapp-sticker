@@ -1,0 +1,88 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id         String      @id @default(uuid()) @db.Uuid
+  // Google account id — stable even if the email changes
+  googleSub  String      @unique
+  email      String      @unique
+  // lowercase, chosen after first login; null until set
+  username   String?     @unique
+  name       String?
+  avatarUrl  String?
+  signs      Sign[]
+  authEvents AuthEvent[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+enum SignSource {
+  model
+  gesture
+  custom
+}
+
+model Sign {
+  id          String       @id @default(uuid()) @db.Uuid
+  // null = built-in sign
+  ownerId     String?      @db.Uuid
+  owner       User?        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name        String
+  source      SignSource
+  gestureName String?
+  stickerUrl  String
+  emojiUrl    String
+  confetti    String
+  colorDark   String
+  colorLight  String
+  samples     SignSample[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([ownerId, createdAt])
+}
+
+model SignSample {
+  id             String   @id @default(uuid()) @db.Uuid
+  signId         String   @db.Uuid
+  sign           Sign     @relation(fields: [signId], references: [id], onDelete: Cascade)
+  // raw MediaPipe landmarks as Float32Array: hands × 21 × (x, y, z)
+  landmarks      Bytes
+  handedness     String[]
+  handCount      Int
+  featureVersion Int
+  createdAt      DateTime @default(now())
+
+  @@index([signId])
+}
+
+enum AuthEventType {
+  login
+  login_failed
+  logout
+  username_set
+}
+
+// Security/audit trail. Never store tokens or credentials here.
+model AuthEvent {
+  id        String        @id @default(uuid()) @db.Uuid
+  type      AuthEventType
+  // null when the user is unknown (e.g. failed login)
+  userId    String?       @db.Uuid
+  user      User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ip        String?
+  userAgent String?
+  // small event-specific details, e.g. { reason } or { from, to }
+  meta      Json?
+  createdAt DateTime      @default(now())
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+}

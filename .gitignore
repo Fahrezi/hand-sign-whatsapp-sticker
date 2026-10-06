@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.wrangler/
+.DS_Store
+.env
+.env.*
+!.env.example
+coverage/
+*.log
+apps/api/src/generated/
+apps/api/uploads/
+deploy/api.env
