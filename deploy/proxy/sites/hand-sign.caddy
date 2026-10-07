@@ -1,0 +1,5 @@
+# DNS: A record handsign-api → VPS public IP (Cloudflare: DNS only until the cert is issued).
+handsign-api.luthfiwork.my.id {
+	encode zstd gzip
+	reverse_proxy hand-sign-api:3000
+}

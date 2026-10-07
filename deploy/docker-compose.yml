@@ -1,5 +1,6 @@
-# Production stack for the VPS: Caddy (HTTPS) in front of the API.
-# Database is Supabase, uploads go to R2 — nothing stateful runs here except Caddy's certs.
+# hand-sign API on the VPS. HTTPS and routing are done by the shared Caddy in deploy/proxy,
+# which reaches this container as `hand-sign-api` on the external `web` network.
+# Database is Supabase, uploads go to R2 — nothing stateful runs here.
 #
 #   cd deploy
 #   docker compose run --rm migrate      # apply Prisma migrations
@@ -7,22 +8,6 @@
 name: hand-sign
 
 services:
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    ports:
-      - '80:80'
-      - '443:443'
-      - '443:443/udp'
-    environment:
-      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in deploy/.env}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    depends_on:
-      - api
-
   api:
     build:
       context: ..
@@ -37,7 +22,11 @@ services:
       TRUST_PROXY: '1'
       NODE_OPTIONS: --max-old-space-size=320
     mem_limit: 448m
-    # no `ports:` — only reachable by Caddy on the internal network
+    # no `ports:` — only reachable by Caddy
+    networks:
+      web:
+        # must be unique across all projects on the `web` network
+        aliases: [hand-sign-api]
 
   # One-off: docker compose run --rm migrate
   migrate:
@@ -51,6 +40,6 @@ services:
     working_dir: /app/apps/api
     command: npx prisma migrate deploy
 
-volumes:
-  caddy-data:
-  caddy-config:
+networks:
+  web:
+    external: true

@@ -1,0 +1,32 @@
+# Shared reverse proxy for every project on this VPS. Lives outside any project repo on the
+# server (copy this folder to ~/apps/proxy). The only container that publishes ports.
+#
+#   docker network create web          # once
+#   docker compose up -d
+#   docker exec caddy caddy reload --config /etc/caddy/Caddyfile   # after editing sites/
+name: proxy
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./sites:/etc/caddy/sites:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - web
+
+volumes:
+  caddy-data:
+  caddy-config:
+
+networks:
+  web:
+    external: true

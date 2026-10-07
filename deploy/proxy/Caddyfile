@@ -1,0 +1,2 @@
+# One file per project in sites/, each mapping a subdomain to a container alias on the `web` network.
+import sites/*.caddy

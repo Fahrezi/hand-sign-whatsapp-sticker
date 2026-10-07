@@ -1,26 +1,43 @@
 # Deploying the API to a VPS
 
-Caddy (automatic HTTPS) → NestJS API in Docker. Postgres is Supabase, uploads go to R2.
-The web app is deployed separately to Cloudflare (`npm run deploy:web`).
+One shared Caddy (automatic HTTPS) routes each subdomain to a project's container over the
+`web` Docker network. hand-sign's API is reached as `hand-sign-api:3000`. Postgres is Supabase,
+uploads go to R2. The web app is deployed separately to Cloudflare (`npm run deploy:web`).
+
+```
+handsign.<domain>      → Cloudflare Workers (web)
+handsign-api.<domain>  → VPS → Caddy → hand-sign-api:3000
+```
 
 ## Prerequisites
 
 - Docker + Compose on the VPS, user in the `docker` group
 - Ports 80 and 443 open (ufw **and** the provider's cloud firewall, if any)
-- DNS `A` record `api.<domain>` → VPS public IP (Cloudflare: "DNS only" until the cert is issued)
-- Web and API on the same site (`example.com` + `api.example.com`) — the session cookie is `SameSite=Lax`
+- DNS `A` record `handsign-api` → VPS public IP (Cloudflare: "DNS only" until the cert is issued)
+- Web and API under the same domain — the session cookie is `SameSite=Lax`
+
+## Once per VPS: shared proxy
+
+```bash
+git clone https://github.com/Fahrezi/hand-sign-whatsapp-sticker.git ~/apps/hand-sign
+cp -r ~/apps/hand-sign/deploy/proxy ~/apps/proxy
+cd ~/apps/proxy
+nano sites/hand-sign.caddy          # replace example.com with your domain
+docker network create web
+docker compose up -d
+```
+
+`~/apps/proxy` is a copy, so later `git pull`s of hand-sign never touch it.
 
 ## First deploy
 
 ```bash
-git clone https://github.com/Fahrezi/hand-sign-whatsapp-sticker.git ~/apps/hand-sign
 cd ~/apps/hand-sign/deploy
-cp .env.example .env            # set API_DOMAIN
-cp api.env.example api.env      # fill in secrets
-chmod 600 .env api.env
+cp api.env.example api.env          # fill in secrets
+chmod 600 api.env
 docker compose run --rm migrate
 docker compose up -d --build
-curl https://api.<domain>/api/health
+curl https://handsign-api.<domain>/api/health
 ```
 
 ## Update
@@ -33,13 +50,21 @@ docker compose up -d --build
 docker image prune -f
 ```
 
+## Adding another project
+
+1. DNS: `A` record `<sub>` → VPS public IP
+2. In its compose: no `ports:`, join the external `web` network with a unique alias
+3. Add `~/apps/proxy/sites/<project>.caddy` with `<sub>.<domain> { reverse_proxy <alias>:<port> }`
+4. `docker exec caddy caddy reload --config /etc/caddy/Caddyfile`
+
 ## Useful
 
 ```bash
 docker compose ps
 docker compose logs -f api
+docker logs -f caddy
 docker stats
 ```
 
-Then build the web app with `VITE_API_URL=https://api.<domain>` and add the web origin to
+Then build the web app with `VITE_API_URL=https://handsign-api.<domain>` and add the web origin to
 "Authorized JavaScript origins" in the Google Cloud OAuth client.
