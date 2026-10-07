@@ -1,5 +1,14 @@
 # DNS: A record handsign-api → VPS public IP (Cloudflare: DNS only until the cert is issued).
+# Only reachable through the web app's Worker (apps/web/worker), which adds X-Proxy-Secret.
 handsign-api.luthfiwork.my.id {
+	@direct not header X-Proxy-Secret {$HAND_SIGN_PROXY_SECRET}
+	respond @direct 403
+
 	encode zstd gzip
-	reverse_proxy hand-sign-api:3000
+	reverse_proxy hand-sign-api:3000 {
+		# the Worker passes the visitor's IP; without this the API would see Cloudflare's
+		header_up X-Forwarded-For {header.X-Client-IP}
+		header_up -X-Proxy-Secret
+		header_up -X-Client-IP
+	}
 }

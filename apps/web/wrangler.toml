@@ -1,6 +1,14 @@
 name = "hand-sign"
 compatibility_date = "2024-09-23"
+main = "worker/index.ts"
 
 [assets]
 directory = "./dist"
+binding = "ASSETS"
 not_found_handling = "single-page-application"
+# only API calls invoke the Worker; pages and assets are served without it
+run_worker_first = ["/api/*"]
+
+[vars]
+API_ORIGIN = "https://handsign-api.luthfiwork.my.id"
+# PROXY_SECRET is a secret: `npx wrangler secret put PROXY_SECRET` (same value as the VPS proxy/.env)

@@ -5,9 +5,12 @@ One shared Caddy (automatic HTTPS) routes each subdomain to a project's containe
 uploads go to R2. The web app is deployed separately to Cloudflare (`npm run deploy:web`).
 
 ```
-handsign.<domain>      → Cloudflare Workers (web)
-handsign-api.<domain>  → VPS → Caddy → hand-sign-api:3000
+handsignsticker.<domain>/api/*  → Cloudflare Worker (adds X-Proxy-Secret)
+                                → handsign-api.<domain> → VPS → Caddy → hand-sign-api:3000
 ```
+
+Caddy answers 403 to any request without the secret, so the API is only reachable through the
+web app's Worker. If `HAND_SIGN_PROXY_SECRET` is empty Caddy refuses to start.
 
 ## Prerequisites
 
@@ -22,7 +25,7 @@ handsign-api.<domain>  → VPS → Caddy → hand-sign-api:3000
 git clone https://github.com/Fahrezi/hand-sign-whatsapp-sticker.git ~/apps/hand-sign
 cp -r ~/apps/hand-sign/deploy/proxy ~/apps/proxy
 cd ~/apps/proxy
-nano sites/hand-sign.caddy          # replace example.com with your domain
+cp .env.example .env && chmod 600 .env   # HAND_SIGN_PROXY_SECRET (same as the Worker's PROXY_SECRET)
 docker network create web
 docker compose up -d
 ```
@@ -66,5 +69,6 @@ docker logs -f caddy
 docker stats
 ```
 
-Then build the web app with `VITE_API_URL=https://handsign-api.<domain>` and add the web origin to
-"Authorized JavaScript origins" in the Google Cloud OAuth client.
+Web app: leave `VITE_API_URL` empty (calls go to `/api` on its own domain), set the Worker secret
+once with `npx wrangler secret put PROXY_SECRET` in `apps/web`, then `npm run deploy:web`. Add the web
+origin to "Authorized JavaScript origins" in the Google Cloud OAuth client.

@@ -6,8 +6,9 @@ Replace `luthfiwork.my.id` with the real domain everywhere below.
 
 ```
 Browser
-  ├─► handsign.luthfiwork.my.id      → Cloudflare Workers (web, free)
-  ├─► handsign-api.luthfiwork.my.id  → VPS → Caddy → NestJS API (Docker)
+  ├─► handsignsticker.luthfiwork.my.id        → Cloudflare Workers (web, free)
+  │     └─ /api/* → Worker adds X-Proxy-Secret
+  │          → handsign-api.luthfiwork.my.id → VPS → Caddy (403 without secret) → NestJS API (Docker)
   │                                         ├─► Supabase Postgres (DB)
   │                                         └─► Cloudflare R2 (sticker uploads)
   └─► R2 public URL                → sticker images
@@ -49,22 +50,28 @@ docs/                these notes
 ## Config — what goes where
 
 **VPS `~/apps/hand-sign/deploy/api.env`** (secrets, `chmod 600`, never committed)
-- `WEB_ORIGIN=https://handsign.luthfiwork.my.id`
+- `WEB_ORIGIN=https://handsignsticker.luthfiwork.my.id`
 - `GOOGLE_CLIENT_ID`, `JWT_SECRET` (new random value, not the dev one)
 - `DATABASE_URL` — Supabase **session pooler**, port 5432
 - `MAX_SIGNS_PER_USER`, `LOG_LEVEL=info`
 - all five `R2_*` — required in prod, container disk is wiped on rebuild
 - `NODE_ENV`, `PORT`, `TRUST_PROXY` are set in `deploy/docker-compose.yml`
 
-**VPS `~/apps/proxy/sites/hand-sign.caddy`**
-- `handsign-api.luthfiwork.my.id { reverse_proxy hand-sign-api:3000 }`
+**VPS `~/apps/proxy/sites/hand-sign.caddy`** + **`~/apps/proxy/.env`**
+- `handsign-api.luthfiwork.my.id` → `hand-sign-api:3000`, 403 unless `X-Proxy-Secret` matches
+- `.env`: `HAND_SIGN_PROXY_SECRET` (same value as the Worker's `PROXY_SECRET`; empty → Caddy won't start)
+
+**Cloudflare Worker (`apps/web/wrangler.toml` + `apps/web/worker/index.ts`)**
+- `API_ORIGIN` var in `wrangler.toml`
+- `PROXY_SECRET`: `npx wrangler secret put PROXY_SECRET` in `apps/web`
+- Only `/api/*` runs the Worker (`run_worker_first`); free plan = 100k Worker requests/day
 
 **Web build (`apps/web/.env` or Cloudflare build vars)** — baked in at build time
 - `VITE_GOOGLE_CLIENT_ID`
-- `VITE_API_URL=https://handsign-api.luthfiwork.my.id`
+- `VITE_API_URL=` **empty** — the web app calls `/api` on its own domain, the Worker forwards it
 
 **Google Cloud Console → OAuth client**
-- Authorized JavaScript origins: `https://handsign.luthfiwork.my.id` (+ `http://localhost:5173` for dev)
+- Authorized JavaScript origins: `https://handsignsticker.luthfiwork.my.id` (+ `http://localhost:5173` for dev)
 
 ## Deploy checklist
 
@@ -78,7 +85,7 @@ One-time
 - [ ] `deploy/api.env` filled from `api.env.example`
 - [ ] `docker compose run --rm migrate` → `docker compose up -d --build`
 - [ ] `curl https://handsign-api.luthfiwork.my.id/api/health` → `{"status":"ok",...}`
-- [ ] Workers Custom Domain `handsign.luthfiwork.my.id`
+- [ ] Workers Custom Domain `handsignsticker.luthfiwork.my.id`
 - [ ] Web rebuilt with `VITE_API_URL`, `npm run deploy:web`
 - [ ] Google OAuth origin added
 - [ ] Smoke test: Google login, create sign, upload sticker (URL points at R2)
@@ -136,7 +143,8 @@ Capacity on 2 vCPU / 2GB: ~4–6 small APIs like this one (API ≈ 90–150MB ea
 | Symptom | Check |
 |---|---|
 | Login works but next request is 401 | Web and API not on the same domain; `WEB_ORIGIN`; HTTPS on both |
-| CORS error in browser | `WEB_ORIGIN` exactly matches the web origin (scheme, no trailing slash) |
+| CORS error in browser | `VITE_API_URL` must be empty (same-origin via Worker); rebuild + redeploy web |
+| 403 on every API call | `PROXY_SECRET` (Worker) ≠ `HAND_SIGN_PROXY_SECRET` (VPS proxy/.env) |
 | Caddy has no cert / TLS error | DNS points at VPS, record is DNS-only, ports 80/443 open in ufw **and** provider firewall; `docker logs caddy` |
 | 502 from Caddy | `docker compose ps` in `deploy/`; alias `hand-sign-api` on `web` network; `docker compose logs api` |
 | API exits on start | `Missing env: ...` / `Incomplete R2 config` in `docker compose logs api` |
